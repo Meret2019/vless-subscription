@@ -13,46 +13,93 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout my repository
         uses: actions/checkout@v4
 
-      - name: Build subscription
+      - name: Download source repository
         run: |
           set -e
 
-          echo "Collecting VLESS configurations..."
+          rm -rf source
+          mkdir -p source
 
-          find . -type f -name "*.txt" \
-            ! -path "./subscription.txt" \
-            ! -path "./subscription_base64.txt" \
-            ! -path "./.git/*" \
-            -print0 \
-            | xargs -0 grep -hE '^vless://[^[:space:]]+' \
-            | sed 's/\r$//' \
-            | sort -u > subscription.txt || true
+          echo "Downloading VP01596/vless-top15..."
 
-          COUNT=$(wc -l < subscription.txt)
+          git clone --depth 1 \
+            https://github.com/VP01596/vless-top15.git \
+            source/vless-top15
 
-          echo "Found $COUNT unique VLESS configurations"
+          echo "Repository downloaded successfully."
+
+      - name: Find all TXT files
+        run: |
+          set -e
+
+          echo "TXT files found:"
+
+          find source/vless-top15 \
+            -type f \
+            -iname "*.txt" \
+            -print
+
+      - name: Collect VLESS configurations
+        run: |
+          set -e
+
+          rm -f subscription.txt
+
+          touch subscription.txt
+
+          while IFS= read -r -d '' file; do
+            echo "Reading: $file"
+
+            grep -E '^vless://[^[:space:]]+' "$file" \
+              >> subscription.txt || true
+
+          done < <(
+            find source/vless-top15 \
+              -type f \
+              -iname "*.txt" \
+              -print0
+          )
+
+          sed -i 's/\r$//' subscription.txt
+
+          sort -u subscription.txt -o subscription.txt
+
+          COUNT=$(grep -c '^vless://' subscription.txt || true)
+
+          echo "================================"
+          echo "VLESS configurations: $COUNT"
+          echo "================================"
 
           if [ "$COUNT" -eq 0 ]; then
-            echo "No VLESS configurations found"
+            echo "ERROR: No VLESS configurations found!"
             exit 1
           fi
 
+      - name: Create Base64 subscription
+        run: |
+          set -e
+
           base64 -w 0 subscription.txt > subscription_base64.txt
+
           echo >> subscription_base64.txt
 
-      - name: Commit changes
+          echo "Base64 subscription created."
+
+      - name: Save subscription
         run: |
+          set -e
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add subscription.txt subscription_base64.txt
 
           if git diff --cached --quiet; then
-            echo "Nothing changed"
+            echo "No changes detected."
           else
-            git commit -m "Update VLESS subscription"
+            git commit -m "Auto update VLESS subscription"
             git push
           fi
