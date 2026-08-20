@@ -2,100 +2,17 @@ name: Build VLESS Subscription
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "*/30 * * * *"
-
-permissions:
-  contents: write
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Checkout my repository
-        uses: actions/checkout@v4
-
-      - name: Download VP01596 repository
+      - name: TEST
         run: |
-          set -e
-
-          rm -rf source
-
-          git clone --depth 1 \
-            https://github.com/VP01596/vless-top15.git \
-            source
-
-          echo "SOURCE DOWNLOADED"
-          echo "================="
-
-          find source -type f -name "*.txt" -print
-
-      - name: Collect VLESS links
-        run: |
-          set -e
-
-          rm -f subscription.txt
-          touch subscription.txt
-
-          echo "Searching VLESS links..."
-
-          find source \
-            -type f \
-            -name "*.txt" \
-            -print0 |
-          while IFS= read -r -d '' file
-          do
-            echo "Reading: $file"
-
-            grep -oE 'vless://[^[:space:]]+' "$file" \
-              >> subscription.txt || true
-
-          done
-
-          sort -u subscription.txt -o subscription.txt
-
-          COUNT=$(grep -c '^vless://' subscription.txt || true)
-
-          echo ""
-          echo "=============================="
-          echo "TOTAL VLESS LINKS: $COUNT"
-          echo "=============================="
-
-          if [ "$COUNT" -eq 0 ]; then
-            echo "ERROR: No VLESS links found!"
-
-            echo "Showing source files:"
-            find source -type f -name "*.txt"
-
-            exit 1
-          fi
-
-      - name: Create Base64 subscription
-        run: |
-          set -e
-
-          base64 -w 0 subscription.txt \
-            > subscription_base64.txt
-
-          echo >> subscription_base64.txt
-
-          echo "BASE64 SUBSCRIPTION CREATED"
-
-      - name: Commit subscription
-        run: |
-          set -e
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add subscription.txt
-          git add subscription_base64.txt
-
-          if git diff --cached --quiet; then
-            echo "No changes"
-          else
-            git commit -m "Auto update VLESS subscription"
-            git push
-          fi
+          echo "NEW WORKFLOW IS RUNNING"
+          echo "================================"
+          git clone --depth 1 https://github.com/VP01596/vless-top15.git source
+          echo "================================"
+          echo "SOURCE FILES:"
+          find source -type f -name "*.txt"
