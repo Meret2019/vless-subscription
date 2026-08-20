@@ -1,0 +1,58 @@
+name: Build VLESS Subscription
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build subscription
+        run: |
+          set -e
+
+          echo "Collecting VLESS configurations..."
+
+          find . -type f -name "*.txt" \
+            ! -path "./subscription.txt" \
+            ! -path "./subscription_base64.txt" \
+            ! -path "./.git/*" \
+            -print0 \
+            | xargs -0 grep -hE '^vless://[^[:space:]]+' \
+            | sed 's/\r$//' \
+            | sort -u > subscription.txt || true
+
+          COUNT=$(wc -l < subscription.txt)
+
+          echo "Found $COUNT unique VLESS configurations"
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "No VLESS configurations found"
+            exit 1
+          fi
+
+          base64 -w 0 subscription.txt > subscription_base64.txt
+          echo >> subscription_base64.txt
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add subscription.txt subscription_base64.txt
+
+          if git diff --cached --quiet; then
+            echo "Nothing changed"
+          else
+            git commit -m "Update VLESS subscription"
+            git push
+          fi
