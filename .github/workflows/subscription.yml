@@ -13,49 +13,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+
+      - name: Checkout my repository
         uses: actions/checkout@v4
 
-      - name: Download source repository
+      - name: Download VP01596 repository
         run: |
           set -e
 
           rm -rf source
-          mkdir -p source
 
           git clone --depth 1 \
             https://github.com/VP01596/vless-top15.git \
-            source/vless-top15
+            source
 
-          echo "Source repository downloaded."
+          echo "SOURCE DOWNLOADED"
+          echo "================="
 
-      - name: Find all TXT files
-        run: |
-          echo "TXT files:"
+          find source -type f -name "*.txt" -print
 
-          find source/vless-top15 \
-            -type f \
-            -iname "*.txt" \
-            -print
-
-      - name: Collect all VLESS links
+      - name: Collect VLESS links
         run: |
           set -e
 
-          : > subscription.txt
+          rm -f subscription.txt
+          touch subscription.txt
 
-          find source/vless-top15 \
+          echo "Searching VLESS links..."
+
+          find source \
             -type f \
-            -iname "*.txt" \
+            -name "*.txt" \
             -print0 |
           while IFS= read -r -d '' file
           do
             echo "Reading: $file"
 
-            # Remove BOM, CR and leading spaces
-            sed 's/\r//g; s/^[[:space:]]*//' "$file" |
-            grep -oE 'vless://[^[:space:]]+' \
-            >> subscription.txt || true
+            grep -oE 'vless://[^[:space:]]+' "$file" \
+              >> subscription.txt || true
 
           done
 
@@ -63,18 +58,17 @@ jobs:
 
           COUNT=$(grep -c '^vless://' subscription.txt || true)
 
-          echo "================================="
-          echo "TOTAL VLESS: $COUNT"
-          echo "================================="
+          echo ""
+          echo "=============================="
+          echo "TOTAL VLESS LINKS: $COUNT"
+          echo "=============================="
 
           if [ "$COUNT" -eq 0 ]; then
-            echo "ERROR: No VLESS links found."
-            echo "Showing sample source content:"
-            find source/vless-top15 \
-              -type f \
-              -iname "*.txt" \
-              -print -quit |
-              xargs -r head -n 20
+            echo "ERROR: No VLESS links found!"
+
+            echo "Showing source files:"
+            find source -type f -name "*.txt"
+
             exit 1
           fi
 
@@ -82,11 +76,12 @@ jobs:
         run: |
           set -e
 
-          base64 -w 0 subscription.txt > subscription_base64.txt
+          base64 -w 0 subscription.txt \
+            > subscription_base64.txt
 
           echo >> subscription_base64.txt
 
-          echo "Subscription created successfully."
+          echo "BASE64 SUBSCRIPTION CREATED"
 
       - name: Commit subscription
         run: |
@@ -95,10 +90,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add subscription.txt subscription_base64.txt
+          git add subscription.txt
+          git add subscription_base64.txt
 
           if git diff --cached --quiet; then
-            echo "No changes."
+            echo "No changes"
           else
             git commit -m "Auto update VLESS subscription"
             git push
