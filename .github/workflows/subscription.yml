@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout my repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download VP01596 repository
+      - name: Download source
         run: |
           set -e
 
@@ -26,30 +26,23 @@ jobs:
             https://github.com/VP01596/vless-top15.git \
             source
 
-          echo "Source downloaded successfully."
-
       - name: Collect all VLESS links
         run: |
           set -e
 
-          rm -f subscription.txt
-          touch subscription.txt
+          : > subscription.txt
 
-          echo "Searching all TXT files..."
-
+          find source \
+            -type f \
+            -name "*.txt" \
+            -print0 |
           while IFS= read -r -d '' file
           do
             echo "Reading: $file"
 
             grep -oE 'vless://[^[:space:]]+' "$file" \
               >> subscription.txt || true
-
-          done < <(
-            find source \
-              -type f \
-              -name "*.txt" \
-              -print0
-          )
+          done
 
           sed -i 's/\r$//' subscription.txt
 
@@ -57,16 +50,10 @@ jobs:
 
           COUNT=$(grep -c '^vless://' subscription.txt || true)
 
-          echo "======================================"
           echo "TOTAL VLESS LINKS: $COUNT"
-          echo "======================================"
 
           if [ "$COUNT" -eq 0 ]; then
             echo "ERROR: No VLESS links found!"
-
-            echo "Example content from All.txt:"
-            head -n 20 source/All.txt
-
             exit 1
           fi
 
@@ -74,14 +61,10 @@ jobs:
         run: |
           set -e
 
-          base64 -w 0 subscription.txt \
-            > subscription_base64.txt
-
+          base64 -w 0 subscription.txt > subscription_base64.txt
           echo >> subscription_base64.txt
 
-          echo "======================================"
           echo "BASE64 SUBSCRIPTION CREATED"
-          echo "======================================"
 
       - name: Commit subscription
         run: |
@@ -93,7 +76,7 @@ jobs:
           git add subscription.txt subscription_base64.txt
 
           if git diff --cached --quiet; then
-            echo "No changes."
+            echo "No changes"
           else
             git commit -m "Auto update VLESS subscription"
             git push
